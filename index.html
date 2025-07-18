@@ -1,0 +1,1871 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Pengukuran Gaya Belajar</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- html2canvas and jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
+        }
+        .page-transition-container > div {
+            animation: fadeIn 0.7s ease-out forwards;
+        }
+
+        /* Custom Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulseSlow {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes bounceSlow {
+            0%, 100%, 20%, 50%, 80% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-10px);
+            }
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+
+        @keyframes scaleBounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes spinSlow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes spinOnce {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-3deg); }
+            50% { transform: rotate(3deg); }
+            75% { transform: rotate(-3deg); }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+
+        .animate-pulse-slow {
+            animation: pulseSlow 3s infinite ease-in-out;
+        }
+
+        .animate-slide-up {
+            animation: slideUp 0.7s ease-out forwards;
+        }
+
+        .animate-bounce-slow {
+            animation: bounceSlow 1.5s infinite;
+        }
+
+        .animate-scale-bounce {
+            animation: scaleBounce 0.3s ease-out;
+        }
+
+        .animate-spin-slow {
+            animation: spinSlow 8s linear infinite;
+        }
+
+        .animate-spin-once {
+            animation: spinOnce 0.6s ease-out;
+        }
+
+        .animate-wiggle {
+            animation: wiggle 0.5s ease-in-out;
+        }
+
+        @media print {
+            /* Hide elements not meant for printing */
+            body > #app-root > div:not(.print-area-container) {
+                display: none !important;
+            }
+            /* Style the printable area */
+            .print-area-container {
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+                border-radius: 0;
+                /* Use the same gradient as the report page */
+                background-image: linear-gradient(to bottom right, #a78bfa, #ec4899) !important; /* Tailwind's purple-400 to pink-500 */
+                color: white !important; /* Ensure text is white for print */
+            }
+            .print-area-container h1, .print-area-container h2, .print-area-container h3, .print-area-container p, .print-area-container span, .print-area-container li {
+                color: white !important; /* Ensure all text inside is white */
+            }
+            /* Override specific text colors within the report for print to ensure readability */
+            .print-area-container .text-gray-200,
+            .print-area-container .text-gray-700,
+            .print-area-container .text-gray-600,
+            .print-area-container .text-gray-800,
+            .print-area-container .text-gray-900 {
+                color: white !important;
+            }
+            .print-area-container .text-blue-800,
+            .print-area-container .text-blue-900,
+            .print-area-container .text-green-800,
+            .print-area-container .text-green-900,
+            .print-area-container .text-yellow-800,
+            .print-area-container .text-yellow-900,
+            .print-area-container .text-purple-800,
+            .print-area-container .text-purple-900 {
+                color: white !important; /* Adjust if these need to stand out more on the gradient */
+            }
+            .print-area-container .bg-blue-100,
+            .print-area-container .bg-green-100,
+            .print-area-container .bg-yellow-100,
+            .print-area-container .bg-purple-100,
+            .print-area-container .bg-indigo-100,
+            .print-area-container .bg-gray-100,
+            .print-area-container .bg-gray-200,
+            .print-area-container .bg-white {
+                background-color: rgba(255, 255, 255, 0.2) !important; /* Make these semi-transparent on gradient */
+                border-color: rgba(255, 255, 255, 0.3) !important;
+            }
+            .print-area-container .border-b-2 {
+                border-color: rgba(255, 255, 255, 0.5) !important;
+            }
+            /* Hide buttons for print */
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app-root"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, query, onSnapshot, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // State variables (simulating React's useState)
+        let currentPage = 'cover'; // Start with cover page
+        let responses = {};
+        let reportData = null;
+        let isLoading = true;
+        let db = null;
+        let auth = null;
+        let userId = null;
+        let userType = null; // 'konselor' or 'klien'
+        let isAuthReady = false;
+        let userReports = []; // For history page
+        let allKlienReports = []; // For konselor dashboard
+        let showModal = false;
+        let modalMessage = '';
+        let currentCategoryIndex = 0;
+        let isGeneratingPdf = false;
+        let biodata = { name: '', class: '', gender: '' };
+        let pageKey = 'cover'; // Key to trigger page transition animation
+
+        // Konselor Dashboard Filter/Search States
+        let konselorSearchTerm = '';
+        let konselorFilterClass = '';
+        let konselorFilterGender = '';
+        let konselorFilterStyle = '';
+
+
+        const appRoot = document.getElementById('app-root');
+        const reportRef = { current: null }; // Simulating useRef for report section
+
+        // Statements grouped by category
+        const categories = [
+            {
+                name: 'Visual',
+                type: 'visual',
+                icon: (className) => `<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>`,
+                statements: [
+                    { id: 'v1', text: 'Saya rapi, teratur, dan memperhatikan penampilan. 👔' },
+                    { id: 'v2', text: 'Saya berbicara dengan cepat. 🗣️' },
+                    { id: 'v3', text: 'Saya perencana dan pengatur jangka panjang yang baik. 📅' },
+                    { id: 'v4', text: 'Saya pengeja yang baik dan bisa membayangkan kata dalam pikiran.🧠' },
+                    { id: 'v5', text: 'Saya lebih mudah mengingat apa yang saya lihat daripada dengar. 👀' },
+                    { id: 'v6', text: 'Saya mengingat dengan asosiasi visual. 🧩' },
+                    { id: 'v7', text: 'Saya kesulitan mengingat instruksi verbal kecuali tertulis. 📝' },
+                    { id: 'v8', text: 'Saya lebih suka membaca sendiri daripada dibacakan. 📖' },
+                    { id: 'v9', text: 'Saya suka mencoret-coret saat menelepon atau rapat. ✍️' },
+                    { id: 'v10', text: 'Saya lebih suka demonstrasi daripada pidato. 📺' },
+                    { id: 'v11', text: 'Saya lebih suka seni gambar daripada musik.🎨' },
+                    { id: 'v12', text: 'Saya sering menjawab singkat dengan “ya” atau “tidak”. 👍' },
+                    { id: 'v13', text: 'Saya tahu maksud saya tapi sulit memilih kata. 🤔' },
+                    { id: 'v14', text: 'Saya tidak terganggu oleh kebisingan. 🔕' },
+                ],
+            },
+            {
+                name: 'Auditori',
+                type: 'auditory',
+                icon: (className) => `<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                </svg>`,
+                statements: [
+                    { id: 'a1', text: 'Saya suka berbicara kepada diri sendiri saat bekerja. 💬' },
+                    { id: 'a2', text: 'Saya mudah terganggu oleh suara bising. 🔊' },
+                    { id: 'a3', text: 'Saya membaca sambil mengucapkan kata. 👄' },
+                    { id: 'a4', text: 'Saya senang membaca keras dan mendengarkan.📢' },
+                    { id: 'a5', text: 'Saya bisa menirukan nada dan intonasi suara. 🎶' },
+                    { id: 'a6', text: 'Saya lebih suka bicara daripada menulis. 🗯️' },
+                    { id: 'a7', text: 'Saya berbicara dengan irama tertentu. 🎤' },
+                    { id: 'a8', text: 'Saya lebih suka musik daripada menggambar.🎵' },
+                    { id: 'a9', text: 'Saya belajar lebih baik dengan mendengarkan. 👥' },
+                    { id: 'a10', text: 'Saya suka berdiskusi panjang lebar. 🗣️' },
+                    { id: 'a11', text: 'Saya lebih suka humor lisan daripada komik. 😂' },
+                    { id: 'a12', text: 'Saya kesulitan dalam tugas visualisasi. 📏' },
+                    { id: 'a13', text: 'Saya lebih pandai mengeja dengan suara. 🔠' },
+                    { id: 'a14', text: 'Saya pembicara yang percaya diri. 🧏' },
+                ],
+            },
+            {
+                name: 'Kinestetik',
+                type: 'kinesthetic',
+                icon: (className) => `<svg class="${className}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 10-4 0v1a1 1 0 001 1h3a1 1 0 001-1V4a2 2 0 10-4 0zm-5 8a2 2 0 10-4 0v1a1 1 0 001 1h3a1 1 0 001-1v-1a2 2 0 10-4 0zM13 16a2 2 0 10-4 0v1a1 1 0 001 1h3a1 1 0 001-1v-1a2 2 0 10-4 0zm5-4a2 2 0 10-4 0v1a1 1 0 001 1h3a1 1 0 001-1v-1a2 2 0 10-4 0zM19 4a2 2 0 10-4 0v1a1 1 0 001 1h3a1 1 0 001-1V4a2 2 0 10-4 0z"></path>
+                </svg>`,
+                statements: [
+                    { id: 'k1', text: 'Saya berbicara dengan perlahan.🐢' },
+                    { id: 'k2', text: 'Saya sering menyentuh orang saat berbicara.✋' },
+                    { id: 'k3', text: 'Saya berdiri dekat saat berbicara.🤝' },
+                    { id: 'k4', text: 'Saya aktif dan banyak bergerak.🕺' },
+                    { id: 'k5', text: 'Saya belajar dengan praktik langsung.🔧' },
+                    { id: 'k6', text: 'Saya menghafal sambil berjalan atau bergerak.🚶' },
+                    { id: 'k7', text: 'Saya menggunakan jari saat membaca.👉' },
+                    { id: 'k8', text: 'Saya sering memakai gerakan tubuh saat bicara.💃' },
+                    { id: 'k9', text: 'Saya tidak bisa diam terlalu lama.⏳' },
+                    { id: 'k10', text: 'Saya hanya ingat tempat jika pernah ke sana.🗺️' },
+                    { id: 'k11', text: 'Saya suka permainan aktif.🧩' },
+                    { id: 'k12', text: 'Saya sering mengetuk pena/jari saat mendengarkan.🥁' },
+                    { id: 'k13', text: 'Saya ingin mencoba semua hal langsung.🧪' },
+                    { id: 'k14', text: 'Tulisan saya tidak terlalu rapi.✍️' },
+                ],
+            },
+        ];
+
+        // Recommendations for each learning style
+        const recommendations = {
+            visual: [
+                'Gunakan peta pikiran, diagram, grafik, dan ilustrasi saat belajar.',
+                'Tonton video pendidikan atau demonstrasi visual.',
+                'Gunakan stabilo dan kode warna pada catatan Anda.',
+                'Bayangkan konsep-konsep dalam pikiran Anda saat membaca atau mendengarkan.',
+                'Gunakan flashcard dengan gambar atau simbol.',
+                'Perhatikan bahasa tubuh guru atau pembicara.',
+                'Buat daftar dan rencanakan tugas secara visual.',
+                'Gunakan warna dan gambar untuk mengatur informasi.'
+            ],
+            auditory: [
+                'Dengarkan ceramah, podcast, atau buku audio.',
+                'Diskusikan materi dengan orang lain atau ajukan pertanyaan.',
+                'Rekam diri Anda saat membaca catatan dan dengarkan kembali.',
+                'Ulangi informasi keras-keras untuk membantu mengingatnya.',
+                'Ikuti diskusi kelompok atau debat.',
+                'Gunakan sajak, lagu, atau irama untuk menghafal.',
+                'Baca materi pelajaran dengan suara keras.',
+                'Minta orang lain menjelaskan konsep kepada Anda.'
+            ],
+            kinesthetic: [
+                'Lakukan eksperimen, simulasi, atau proyek praktis.',
+                'Gunakan gerakan tubuh atau berjalan-jalan saat belajar.',
+                'Ambil istirahat singkat dan lakukan aktivitas fisik.',
+                'Gunakan kartu flash atau alat bantu belajar yang dapat dimanipulasi.',
+                'Belajar sambil melakukan aktivitas fisik ringan (misalnya, berjalan di ruangan).',
+                'Gunakan alat peraga atau model untuk memahami konsep.',
+                'Libatkan diri dalam permainan peran atau simulasi.',
+                'Tulis atau gambar sambil belajar untuk melibatkan otot.',
+                'Gunakan isyarat tangan atau gerakan tubuh saat menjelaskan sesuatu.',
+                'Ubah posisi duduk atau lingkungan belajar secara berkala.'
+            ],
+        };
+
+        // List of names for the autocomplete feature
+        const allNames = [
+            "ABDUL JABBAR KARIMADITYA ALZAM MUYASSARAIDAN NAKHLA BAGASTYA",
+            "ALTHAF FUAD",
+            "IALVINO ALHADID",
+            "AMIRUL HAKIMI IRAWAN",
+            "AMMAR IRSYAD HAMDANI",
+            "ANDI ABDULLAH DZAKY MARFAN NUGRAHA",
+            "ARKAN KHAIRUL RAFIF",
+            "ARMAN SYAH SHIDDIQ",
+            "ARRAYAN ZAIN",
+            "AZKA ALDRICK LASUT",
+            "BAGAS SATRIA WIBAWA",
+            "BARRAQDZAKY ALFATIHBINTANG MALAKA TRISNA",
+            "DALAFUN YAAFIG",
+            "DHAFFA MUHAMMAD BAIHAQIE",
+            "DZAKY KHAIRUL RAJA SAPUTRA",
+            "FAID ABDURRAHMAN MUWAFFAQ",
+            "AHFAIZAN MAULANA",
+            "FARIDZ AL BATAMI",
+            "FARREL AFRIADI",
+            "FATHUL KARIM KRESNADANI",
+            "Abdullah Az Zubair",
+            "Kaizan Putra Ismar Tuduhu",
+            "MUHAMMAD HAFIZH ANDRA SITUMORANG",
+            "MUHAMMAD HAIKAL AL FIKRI",
+            "MUHAMMAD HANIF",
+            "MUHAMMAD HANIIF FADHLURRAHMAN",
+            "MUHAMMAD IRSYADUDDIN",
+            "MUHAMMAD KHALIL ALFAREZEL",
+            "MUHAMMAD MISYARI RASYID RIZAL",
+            "MUHAMMAD MUSTAKIM TIMUNG",
+            "MUHAMMAD NABHAN AMER",
+            "MUHAMMAD NURRAHMAN",
+            "MUHAMMAD RADIRZA RASYAD",
+            "MUHAMMAD RAFI PRAWIRA",
+            "MUHAMMAD TEGUH NUGRAHA",
+            "MUHAMMAD THALHAH PUTRA",
+            "MUHAMAD ABDILLAH ZIKRI",
+            "MUHAMMAD YUSUP",
+            "MUSH'AB ABDUL HAFIZ",
+            "NAUFAL DZAKY WIBOWO PUTRA",
+            "RAFFASYA AYDIN ALFARIZQI",
+            "RAHMAT RIZKILLAH HENLY",
+            "RAKA PERATAMA NASUTION",
+            "REISYA QOIS HEMDA ARFAN",
+            "REVANDIKA HAFIZ",
+            "TAUFIK ALFIN",
+            "YUSUF ARKANA RAZZAK",
+            "YUSUF PUTRA PAMUNGKAS",
+            "ZHARIF ATH THAHIR",
+            "FATIH ABDULLAH MUBAROK",
+            "FAUZAN MULYADI",
+            "FEBRIAN HENDRIYADI DEFENDI",
+            "FHATAN RAUHILLAH THOHA",
+            "GIBRAL THARIQ KHAIRULLAH",
+            "HANIF AHMAD",
+            "HANIF HAMIZAN VERDE",
+            "HIRZAN RADITYA",
+            "IBRAHIM",
+            "ISMAIL HASAN",
+            "IZZATUL AZMI ULINNUHA",
+            "KENZUE AHZA BRILLIANTDYAK",
+            "HOIRUL AZZAMM ADHIEM FAKHRI AL IDRUS",
+            "MUHAMMAD NIZAM ZULIAFA",
+            "MUAMMAR ABDILLAH",
+            "MUHAMMAD ADZKA AULIA RAHMAN",
+            "MUHAMMAD AFIF ABDILLAH",
+            "MUHAMMAD ALFAQIL FAUZAN",
+            "MUHAMMAD AZZAM KHALILULLAH",
+            "MUHAMMAD EL DZAKI ALEXANDER",
+            "MUHAMMAD FADEL ELVISNUR",
+            "MUHAMMAD FADZAL SURYA SAPUTRA",
+            "MUHAMMAD FAIZAN PRATAMA",
+            "MUHAMMAD GIBRAN ATHAILLAH KESUMAA",
+            "MUHAMMAD HABIL ABDULLAH",
+            "MUHAMMAD HADHI SAPUTRA",
+            "ABDURRAHMAN KAYSAN RASYID",
+            "DAFFA GHULAM ALFATIHMUHAMMAD HAIDAR FADILLAH",
+            "MUHAMMAD HAIKAL 1",
+            "MUHAMMAD HAIKAL 2",
+            "MUHAMMAD KHAIRI DZUKWAN",
+            "MUHAMMAD MAULANA ZAIDIN KAMULEY",
+            "MUHAMMAD NABIL ARDI",
+            "MUHAMMAD NAUFAL AL HARITS",
+            "MUHAMMAD RAFIF KURNIAWAN",
+            "MUHAMMAD SYAUQI PUTRA TANJUNGMUHAMMAD VITO ALFAREZEL",
+            "MUHAMMAD YUSUF ADZIKRA",
+            "MUHAMMAD ZIDANE",
+            "NAFAL ASYRAF RAMADHAN",
+            "NATHAN PUTRA AMRIN",
+            "RAFIF KHALIL SASHENKA",
+            "RIFQI ALDIANSYAH FITRA",
+            "RIJALULHADI",
+            "RYO DZAKI SABRI PRASETYO",
+            "SAVIOLA ROHIM",
+            "TEUKU MUHAMMAD ZAWIL KIRAM",
+            "UMAR AL FARUQ",
+            "WAHYU ABDILLAH HENLY",
+            "WAN MUHAMMAD AGAS",
+            "HAZIYAD ZAKHIR WILDANSYAH"
+        ];
+
+        // Helper for Lucide icons (simplified for HTML)
+        const getLucideIcon = (iconName, className) => {
+            const icons = {
+                Play: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`,
+                ClipboardCheck: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"></path><path d="m9 14 2 2 4-4"></path></svg>`,
+                History: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.76 2.75L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>`,
+                ArrowLeft: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>`,
+                ArrowRight: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>`,
+                Check: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+                X: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>`,
+                ChevronRight: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><polyline points="9 18 15 12 9 6"></polyline></svg>`,
+                FileText: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>`,
+                RefreshCw: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.76 2.75L3 8"></path><path d="M3 3v5h5"></path><path d="M21 21v-5h-5"></path><path d="M21 12a9 9 0 0 0-9 9 9.75 9.75 0 0 0 6.76-2.75L21 16"></path></svg>`,
+                Save: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`,
+                Printer: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect width="12" height="8" x="6" y="14"></rect></svg>`,
+                Download: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>`,
+                Home: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`,
+                XCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><circle cx="12" cy="12" r="10"></circle><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg>`,
+                Lightbulb: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 6c0 1.8.7 3.5 2 4.9l.5.5c.7.7 1 1.6 1 2.6V15a2 2 0 0 1-2 2H6l-1 1 1 1h4.5a2 2 0 0 1 2 2v1h.5a2 2 0 0 1 2-2v-1h.5a2 2 0 0 1 2-2v-1.5z"></path></svg>`,
+                Pointer: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M22 14a8 8 0 0 1-8 8"></path><path d="M18 10a4 4 0 0 0-4-4"></path><path d="M12 2v10l3 3H22l-7-7Z"></path><path d="M2 22l7-7"></path></svg>`,
+                CheckCircle: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`,
+                User: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`,
+                Book: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>`,
+                Users: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`,
+                LogOut: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="17 17 22 12 17 7"></polyline><line x1="22" x2="10" y1="12" y2="12"></line></svg>`,
+                Eye: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>`,
+                EyeOff: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-10-7-10-7a18.06 18.06 0 0 1 5.47-2.91M12 10.75V12m-2.29-4.29a3 3 0 0 0-1.21 1.21"></path><path d="M6.61 6.61A13.526 13.526 0 0 1 12 4c7 0 10 7 10 7a18.06 18.06 0 0 1-2.07 3.37M2 2l20 20"></path></svg>`,
+                RotateCcw: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.76 2.75L3 8"></path><path d="M3 3v5h5"></path></svg>`,
+                Lock: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
+                LogIn: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" x2="3" y1="12" y2="12"></line></svg>`
+            };
+            return icons[iconName] || '';
+        };
+
+        // Firebase Initialization and Authentication
+        async function initializeFirebase() {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            let firebaseConfig = {};
+            try {
+                firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            } catch (e) {
+                console.error("Error parsing firebase config:", e);
+            }
+
+
+            if (!Object.keys(firebaseConfig).length) {
+                console.error("Firebase config is missing. Please ensure __firebase_config is provided.");
+                isLoading = false;
+                render();
+                return;
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                    } else {
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await signInWithCustomToken(auth, __initial_auth_token);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                        } catch (error) {
+                            console.error("Error signing in:", error);
+                            // Warn if custom token failed, as it might be an environment issue
+                            if (error.code === 'auth/invalid-custom-token') {
+                                console.warn("Custom authentication token is invalid. Falling back to anonymous sign-in. Please check your token configuration.");
+                            }
+                            setModalMessage(`Kesalahan saat masuk: ${error.message}`);
+                            setShowModal(true);
+                        }
+                    }
+                    isLoading = false;
+                    render(); // Re-render after auth state changes
+                    if (userId && isAuthReady) {
+                        fetchUserReports(); // Fetch reports for history view
+                        if (userType === 'konselor') {
+                             fetchAllKlienReports(); // Fetch all reports for konselor dashboard
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                isLoading = false;
+                render();
+            }
+        }
+
+        /**
+         * Converts a timestamp (Firestore Timestamp, ISO string, or number) into a formatted date string.
+         * Handles invalid dates and unexpected types gracefully.
+         * @param {firebase.firestore.Timestamp|string|number} timestamp - The timestamp to convert.
+         * @returns {string} The formatted date string or an error message.
+         */
+        const getDisplayDate = (timestamp) => {
+            if (!timestamp) {
+                return 'Tidak Diketahui';
+            }
+
+            let dateObj;
+            // Check if it's a Firestore Timestamp object
+            if (typeof timestamp.toDate === 'function') {
+                dateObj = timestamp.toDate();
+            } else if (typeof timestamp === 'string') { // Assume it's an ISO string
+                dateObj = new Date(timestamp);
+            } else if (typeof timestamp === 'number') { // Assume it's a Unix timestamp (milliseconds)
+                dateObj = new Date(timestamp);
+            } else {
+                console.warn("Unexpected timestamp type:", typeof timestamp, timestamp);
+                return 'Tanggal Tidak Valid (Tipe Tidak Dikenal)';
+            }
+
+            if (isNaN(dateObj.getTime())) {
+                console.error("Invalid Date object created from timestamp:", timestamp);
+                return 'Tanggal Tidak Valid';
+            }
+
+            return dateObj.toLocaleDateString('id-ID', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        };
+
+        async function fetchUserReports() {
+            if (db && userId && isAuthReady) {
+                // Ensure Firestore security rules allow:
+                // match /artifacts/{appId}/users/{userId}/{collection=**} {
+                //   allow read, write: if request.auth != null && request.auth.uid == userId;
+                // }
+                const reportsCollectionRef = collection(db, `artifacts/${__app_id}/users/${userId}/learningStyleReports`);
+                const q = query(reportsCollectionRef);
+
+                onSnapshot(q, (snapshot) => {
+                    userReports = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data(),
+                        timestamp: doc.data().timestamp // Store Firestore Timestamp directly
+                    }));
+                    userReports.sort((a, b) => {
+                        // Safely convert timestamps to Date objects for sorting
+                        const dateA = a.timestamp && typeof a.timestamp.toDate === 'function' ? a.timestamp.toDate() : (typeof a.timestamp === 'string' ? new Date(a.timestamp) : new Date(0));
+                        const dateB = b.timestamp && typeof b.timestamp.toDate === 'function' ? b.timestamp.toDate() : (typeof b.timestamp === 'string' ? new Date(b.timestamp) : new Date(0));
+                        return dateB.getTime() - dateA.getTime();
+                    });
+                    render();
+                }, (error) => {
+                    console.error("Error fetching user reports:", error);
+                    setModalMessage(`Kesalahan saat mengambil laporan pengguna: ${error.message}`);
+                    setShowModal(true);
+                    render();
+                });
+            }
+        }
+
+        async function fetchAllKlienReports() {
+            if (db && isAuthReady && userType === 'konselor') {
+                // Ensure Firestore security rules allow:
+                // match /artifacts/{appId}/public/data/{collection=**} {
+                //   allow read, write: if request.auth != null;
+                // }
+                const allReportsCollectionRef = collection(db, `artifacts/${__app_id}/public/data/allLearningStyleReports`);
+                const q = query(allReportsCollectionRef);
+
+                onSnapshot(q, (snapshot) => {
+                    allKlienReports = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data(),
+                        timestamp: doc.data().timestamp // Store Firestore Timestamp directly
+                    }));
+                    allKlienReports.sort((a, b) => {
+                        // Safely convert timestamps to Date objects for sorting
+                        const dateA = a.timestamp && typeof a.timestamp.toDate === 'function' ? a.timestamp.toDate() : (typeof a.timestamp === 'string' ? new Date(a.timestamp) : new Date(0));
+                        const dateB = b.timestamp && typeof b.timestamp.toDate === 'function' ? b.timestamp.toDate() : (typeof b.timestamp === 'string' ? new Date(b.timestamp) : new Date(0));
+                        return dateB.getTime() - dateA.getTime();
+                    });
+                    render();
+                }, (error) => {
+                    console.error("Error fetching all klien reports:", error);
+                    setModalMessage(`Kesalahan saat mengambil semua laporan klien: ${error.message}`);
+                    setShowModal(true);
+                    render();
+                });
+            }
+        }
+
+        const handleResponseChange = (statementId, score, clickedButton) => {
+            const oldAllStatementsAnsweredInCurrentCategory = categories[currentCategoryIndex].statements.every(
+                (statement) => responses[statement.id] !== undefined
+            );
+
+            responses = {
+                ...responses,
+                [statementId]: score
+            };
+
+            const statementContainer = clickedButton.closest('.relative.p-6');
+            if (statementContainer) {
+                const yesButton = statementContainer.querySelector('[data-score="1"]');
+                const noButton = statementContainer.querySelector('[data-score="0"]');
+
+                const selectedClasses = ['bg-gradient-to-r', 'from-blue-600', 'to-blue-800', 'text-white', 'shadow-xl', 'scale-105', 'animate-scale-bounce', 'from-red-600', 'to-red-800'];
+                const unselectedClasses = ['bg-gray-200', 'text-blue-700', 'hover:bg-blue-300', 'hover:shadow-md', 'text-red-700', 'hover:bg-red-300'];
+
+                yesButton.classList.remove(...selectedClasses);
+                yesButton.classList.add('bg-gray-200', 'text-blue-700', 'hover:bg-blue-300', 'hover:shadow-md');
+
+                noButton.classList.remove(...selectedClasses);
+                noButton.classList.add('bg-gray-200', 'text-red-700', 'hover:bg-red-300', 'hover:shadow-md');
+
+                if (score === 1) {
+                    yesButton.classList.remove('bg-gray-200', 'text-blue-700', 'hover:bg-blue-300', 'hover:shadow-md');
+                    yesButton.classList.add('bg-gradient-to-r', 'from-blue-600', 'to-blue-800', 'text-white', 'shadow-xl', 'scale-105', 'animate-scale-bounce');
+                } else {
+                    noButton.classList.remove('bg-gray-200', 'text-red-700', 'hover:bg-red-300', 'hover:shadow-md');
+                    noButton.classList.add('bg-gradient-to-r', 'from-red-600', 'to-red-800', 'text-white', 'shadow-xl', 'scale-105', 'animate-scale-bounce');
+                }
+            }
+
+            const totalStatementsOverall = categories.reduce((acc, cat) => acc + cat.statements.length, 0);
+            const answeredStatementsCount = Object.keys(responses).length;
+            const overallProgress = (answeredStatementsCount / totalStatementsOverall) * 100;
+
+            const progressBar = appRoot.querySelector('.bg-purple-600.h-3.rounded-full');
+            const progressText = appRoot.querySelector('.text-right.text-sm.text-gray-600');
+
+            if (progressBar) {
+                progressBar.style.width = `${overallProgress}%`;
+            }
+            if (progressText) {
+                progressText.textContent = `Progres Keseluruhan: ${Math.round(overallProgress)}%`;
+            }
+
+            const newAllStatementsAnsweredInCurrentCategory = categories[currentCategoryIndex].statements.every(
+                (statement) => responses[statement.id] !== undefined
+            );
+
+            if (newAllStatementsAnsweredInCurrentCategory !== oldAllStatementsAnsweredInCurrentCategory) {
+                render();
+            }
+        };
+
+        const calculateReport = () => {
+            const scores = {
+                visual: 0,
+                auditory: 0,
+                kinesthetic: 0,
+            };
+
+            categories.forEach(category => {
+                category.statements.forEach(statement => {
+                    const score = responses[statement.id];
+                    if (score !== undefined) {
+                        scores[category.type] += score;
+                    }
+                });
+            });
+
+            const maxScore = Math.max(scores.visual, scores.auditory, scores.kinesthetic);
+            const dominantStyles = [];
+            if (scores.visual === maxScore) dominantStyles.push('Visual');
+            if (scores.auditory === maxScore) dominantStyles.push('Auditori');
+            if (scores.kinesthetic === maxScore) dominantStyles.push('Kinestetik');
+
+            reportData = {
+                responses: responses, // Store full responses for re-loading
+                scores,
+                dominantStyles,
+                timestamp: new Date().toISOString(), // Store ISO string for new reports initially
+                biodata: { ...biodata }
+            };
+            // This function now only calculates reportData, navigation is handled by handleSubmitAssessment
+        };
+
+        const handleSubmitAssessment = async () => {
+            calculateReport(); // Calculate reportData first
+
+            if (!db || !userId || !reportData) {
+                setModalMessage("Tidak dapat menyimpan laporan: Firebase tidak siap atau data laporan kosong.");
+                setShowModal(true);
+                render();
+                return;
+            }
+
+            isGeneratingPdf = true; // Use this flag to show saving message
+            setModalMessage("Sedang menyimpan laporan, mohon tunggu...");
+            setShowModal(true);
+            render();
+
+            try {
+                const reportId = `${userId}_${Date.now()}`;
+                const reportDocRefUser = doc(db, `artifacts/${__app_id}/users/${userId}/learningStyleReports`, reportId);
+                const reportDocRefPublic = doc(db, `artifacts/${__app_id}/public/data/allLearningStyleReports`, reportId); // Public copy for konselor
+
+                const reportToSave = {
+                    responses: reportData.responses,
+                    scores: reportData.scores,
+                    dominantStyles: reportData.dominantStyles,
+                    timestamp: serverTimestamp(), // Save Firestore Timestamp
+                    userId: userId,
+                    biodata: reportData.biodata
+                };
+
+                await setDoc(reportDocRefUser, reportToSave);
+                await setDoc(reportDocRefPublic, reportToSave); // Save public copy
+
+                setModalMessage("Laporan berhasil disimpan!");
+            } catch (error) {
+                console.error("Error saving report:", error);
+                setModalMessage(`Kesalahan saat menyimpan laporan: ${error.message}`);
+            } finally {
+                isGeneratingPdf = false;
+                render(); // Re-render to update modal state if needed
+                setTimeout(() => {
+                    setShowModal(false);
+                    navigateToPage('start'); // Redirect to start page after 3 seconds
+                }, 3000); // 3 seconds
+            }
+        };
+
+
+        const handleSaveAndDownloadPdf = async () => {
+            if (!db || !userId || !reportData) {
+                setModalMessage("Tidak dapat menyimpan atau mengunduh laporan: Firebase tidak siap atau data laporan kosong.");
+                setShowModal(true);
+                render();
+                return;
+            }
+
+            isGeneratingPdf = true;
+            setModalMessage("Sedang membuat PDF, mohon tunggu..."); // Changed message
+            setShowModal(true);
+            render();
+
+            try {
+                // No need to save to Firestore again here, as it's assumed to be saved on submission
+                // This function is for PDF generation from the report view.
+
+                if (typeof window.html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+                    throw new Error("html2canvas or jsPDF libraries are not loaded.");
+                }
+
+                const canvas = await window.html2canvas(reportRef.current, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: null // Keep null to allow background from CSS
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+
+                let imgWidth = pdfWidth;
+                let imgHeight = canvas.height * pdfWidth / canvas.width;
+
+                if (imgHeight > pdfHeight) {
+                    imgHeight = pdfHeight;
+                    imgWidth = canvas.width * pdfHeight / canvas.height;
+                }
+
+                const xPos = (pdfWidth - imgWidth) / 2;
+                const yPos = (pdfHeight - imgHeight) / 2;
+
+                pdf.addImage(imgData, 'PNG', xPos, yPos, imgWidth, imgHeight);
+                pdf.save(`Laporan_Gaya_Belajar_${reportData.biodata.name.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`);
+                setModalMessage("PDF berhasil diunduh!"); // Only PDF download message here
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                setModalMessage(`Kesalahan saat membuat PDF: ${error.message}`);
+            } finally {
+                isGeneratingPdf = false;
+                setTimeout(() => {
+                    setShowModal(false);
+                    render();
+                }, 3000);
+            }
+        };
+
+        const handlePrintReport = () => {
+            if (reportRef.current) {
+                const printContent = reportRef.current.outerHTML;
+                const printWindow = window.open('', '_blank');
+                printWindow.document.open();
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Laporan Gaya Belajar</title>
+                        <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+                        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+                        <style>
+                            body {
+                                font-family: 'Inter', sans-serif;
+                                margin: 0;
+                                padding: 20px;
+                                /* Ensure the body background is transparent or matches print area */
+                                background-color: transparent;
+                            }
+                            .print-area-container {
+                                width: 100%;
+                                margin: 0 auto;
+                                padding: 0;
+                                box-shadow: none;
+                                border-radius: 0;
+                                /* Apply the same gradient background */
+                                background-image: linear-gradient(to bottom right, #a78bfa, #ec4899) !important;
+                                color: white !important; /* Ensure text is white for print */
+                            }
+                            /* Adjust text colors for readability on the gradient background */
+                            .print-area-container h1, .print-area-container h2, .print-area-container h3, .print-area-container p, .print-area-container span, .print-area-container li {
+                                color: white !important;
+                            }
+                            .print-area-container .text-gray-200,
+                            .print-area-container .text-gray-700,
+                            .print-area-container .text-gray-600,
+                            .print-area-container .text-gray-800,
+                            .print-area-container .text-gray-900 {
+                                color: white !important;
+                            }
+                            .print-area-container .text-blue-800,
+                            .print-area-container .text-blue-900,
+                            .print-area-container .text-green-800,
+                            .print-area-container .text-green-900,
+                            .print-area-container .text-yellow-800,
+                            .print-area-container .text-yellow-900,
+                            .print-area-container .text-purple-800,
+                            .print-area-container .text-purple-900 {
+                                color: white !important;
+                            }
+                            /* Make inner content backgrounds semi-transparent */
+                            .print-area-container .bg-blue-100,
+                            .print-area-container .bg-green-100,
+                            .print-area-container .bg-yellow-100,
+                            .print-area-container .bg-purple-100,
+                            .print-area-container .bg-indigo-100,
+                            .print-area-container .bg-gray-100,
+                            .print-area-container .bg-gray-200,
+                            .print-area-container .bg-white {
+                                background-color: rgba(255, 255, 255, 0.2) !important;
+                                border-color: rgba(255, 255, 255, 0.3) !important;
+                            }
+                            .print-area-container .border-b-2 {
+                                border-color: rgba(255, 255, 255, 0.5) !important;
+                            }
+                            .no-print {
+                                display: none !important;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="print-area-container">${printContent}</div>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.print();
+                printWindow.close();
+            }
+        };
+
+        const navigateToPage = (pageName) => {
+            pageKey = pageName;
+            currentPage = pageName;
+            render();
+            window.scrollTo(0, 0);
+        };
+
+        const setShowModal = (value) => {
+            showModal = value;
+            render();
+        };
+
+        const setModalMessage = (message) => {
+            modalMessage = message;
+            render();
+        };
+
+        const setBiodataField = (field, value) => {
+            biodata = { ...biodata, [field]: value };
+            render();
+        };
+
+        const dominantStyleSummary = () => {
+            if (!reportData || !reportData.dominantStyles || reportData.dominantStyles.length === 0) return '';
+            const styles = reportData.dominantStyles;
+            if (styles.length === 1) {
+                const style = styles[0];
+                if (style === 'Visual') return 'Anda paling efektif belajar dengan melihat, seperti melalui grafik, gambar, dan video. Visualisasi membantu Anda memahami dan mengingat informasi.';
+                if (style === 'Auditori') return 'Anda belajar terbaik melalui pendengaran, seperti diskusi, ceramah, dan mendengarkan penjelasan. Suara dan ritme sangat membantu proses belajar Anda.';
+                if (style === 'Kinestetik') return 'Anda adalah pembelajar aktif, paling baik belajar dengan melakukan, bergerak, dan mengalami langsung. Pengalaman fisik dan interaksi langsung memperkuat pemahaman Anda.';
+            } else if (styles.length === 2) {
+                const [s1, s2] = styles;
+                let summary = `Anda memiliki kombinasi gaya belajar ${s1} dan ${s2}. Ini berarti Anda efektif belajar dengan menggabungkan metode yang melibatkan `;
+                if (s1 === 'Visual' || s2 === 'Visual') summary += 'visualisasi (melihat), ';
+                if (s1 === 'Auditori' || s2 === 'Auditori') summary += 'pendengaran (mendengar), ';
+                if (s1 === 'Kinestetik' || s2 === 'Kinestetik') summary += 'dan gerakan (melakukan). ';
+                return summary.slice(0, -2) + '.';
+            } else {
+                return 'Anda memiliki gaya belajar yang seimbang antara Visual, Auditori, dan Kinestetik. Ini adalah keuntungan besar karena Anda dapat beradaptasi dengan berbagai metode pembelajaran dan menyerap informasi melalui melihat, mendengar, dan melakukan.';
+            }
+            return '';
+        };
+
+        const getConciseRecommendations = (styleType) => {
+            if (!recommendations[styleType] || recommendations[styleType].length === 0) {
+                return 'Tidak ada rekomendasi ringkas yang tersedia.';
+            }
+            if (styleType === 'visual') {
+                return 'Gunakan visualisasi, diagram, dan kode warna pada catatan Anda. Tonton video dan perhatikan demonstrasi.';
+            } else if (styleType === 'auditory') {
+                return 'Belajar melalui diskusi, ceramah, dan mendengarkan. Ulangi informasi keras-keras dan gunakan irama.';
+            } else if (styleType === 'kinesthetic') {
+                return 'Libatkan diri dalam praktik langsung, eksperimen, dan gerakan. Gunakan alat peraga dan ubah posisi belajar.';
+            }
+            return 'Rekomendasi umum untuk gaya ini.';
+        };
+
+        const handleLogin = () => {
+            const userTypeSelect = appRoot.querySelector('#user-type');
+            const passwordInput = appRoot.querySelector('#password');
+
+            const selectedUserType = userTypeSelect.value;
+            const enteredPassword = passwordInput.value;
+
+            if (!selectedUserType || !enteredPassword) {
+                setModalMessage("Mohon lengkapi semua bidang.");
+                setShowModal(true);
+                return;
+            }
+
+            if (selectedUserType === 'konselor' && enteredPassword === '123') {
+                userType = 'konselor';
+                setModalMessage("Login berhasil! Anda akan diarahkan ke dashboard konselor.");
+                setShowModal(true);
+                setTimeout(() => {
+                    setShowModal(false);
+                    fetchAllKlienReports(); // Fetch reports for konselor view
+                    navigateToPage('konselorDashboard');
+                }, 1000); // 1 second delay for modal
+            } else if (selectedUserType === 'klien' && enteredPassword === '1') {
+                userType = 'klien';
+                setModalMessage("Login berhasil! Anda akan diarahkan ke halaman utama.");
+                setShowModal(true);
+                setTimeout(() => {
+                    setShowModal(false);
+                    navigateToPage('start');
+                }, 1000); // 1 second delay for modal
+            } else {
+                setModalMessage("Login gagal. Nama pengguna atau kata sandi salah. Silakan coba lagi.");
+                setShowModal(true);
+            }
+        };
+
+        const handleLogout = async () => {
+            try {
+                if (auth) { // Added check for auth object
+                    await signOut(auth);
+                }
+                userType = null;
+                userId = null;
+                isAuthReady = false;
+                responses = {};
+                reportData = null;
+                currentCategoryIndex = 0;
+                biodata = { name: '', class: '', gender: '' };
+                userReports = [];
+                allKlienReports = [];
+                konselorSearchTerm = ''; // Reset konselor filters on logout
+                konselorFilterClass = '';
+                konselorFilterGender = '';
+                konselorFilterStyle = '';
+                navigateToPage('login');
+            } catch (error) {
+                console.error("Error logging out:", error);
+                setModalMessage(`Kesalahan saat logout: ${error.message}`);
+                setShowModal(true);
+            }
+        };
+
+        const getFilteredKlienReports = () => {
+            let filteredReports = allKlienReports;
+
+            if (konselorSearchTerm) {
+                const lowerCaseSearchTerm = konselorSearchTerm.toLowerCase();
+                filteredReports = filteredReports.filter(report =>
+                    (report.biodata?.name?.toLowerCase().includes(lowerCaseSearchTerm) ||
+                     report.biodata?.class?.toLowerCase().includes(lowerCaseSearchTerm) ||
+                     report.biodata?.gender?.toLowerCase().includes(lowerCaseSearchTerm) ||
+                     report.dominantStyles?.some(style => style.toLowerCase().includes(lowerCaseSearchTerm)))
+                );
+            }
+
+            if (konselorFilterClass) {
+                filteredReports = filteredReports.filter(report => report.biodata?.class === konselorFilterClass);
+            }
+            if (konselorFilterGender) {
+                filteredReports = filteredReports.filter(report => report.biodata?.gender === konselorFilterGender);
+            }
+            if (konselorFilterStyle) {
+                filteredReports = filteredReports.filter(report => report.dominantStyles?.includes(konselorFilterStyle));
+            }
+
+            return filteredReports;
+        };
+
+
+        function render() {
+            let htmlContent = '';
+            const logoUrl = "https://i.ibb.co/dwT4tqxt/download-1-removebg-preview.png";
+            const isBiodataComplete = biodata.name && biodata.class && biodata.gender;
+            const currentCategory = categories[currentCategoryIndex];
+            const allStatementsAnsweredInCurrentCategory = currentCategory?.statements.every(
+                (statement) => responses[statement.id] !== undefined
+            );
+            const totalStatementsOverall = categories.reduce((acc, cat) => acc + cat.statements.length, 0);
+            const answeredStatementsCount = Object.keys(responses).length;
+            const overallProgress = (answeredStatementsCount / totalStatementsOverall) * 100;
+            const allStatementsAnsweredOverall = Object.keys(responses).length === totalStatementsOverall;
+
+            if (isLoading) {
+                htmlContent = `
+                    <div class="flex items-center justify-center h-screen bg-gradient-to-br from-blue-500 to-purple-600">
+                        <div class="text-white text-3xl font-bold animate-pulse">Memuat aplikasi...</div>
+                    </div>
+                `;
+            } else if (currentPage === 'cover') {
+                htmlContent = `
+                    <div class="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-blue-700 to-purple-800 text-white animate-fade-in">
+                        <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-sm p-12 rounded-3xl shadow-2xl max-w-3xl w-full text-center transform transition-all duration-500 ease-in-out scale-100 hover:scale-105">
+                            <img src="${logoUrl}" alt="Logo Konseling" class="mx-auto mb-8 w-32 h-32 object-contain" onerror="this.onerror=null;this.src='https://placehold.co/128x128/ccc/fff?text=Logo';" />
+                            <h1 class="text-6xl font-extrabold mb-8 drop-shadow-lg animate-pulse-slow">
+                                Selamat Datang di Aplikasi Gaya Belajar
+                            </h1>
+                            <p class="text-2xl mb-12 leading-relaxed">
+                                Temukan potensi belajar terbaik Anda dan raih kesuksesan!
+                            </p>
+                            <button id="start-button" class="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-bold py-5 px-12 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-300 text-xl flex items-center justify-center mx-auto">
+                                ${getLucideIcon('Play', 'w-7 h-7 mr-3 animate-bounce-slow')} Mulai Sekarang
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (currentPage === 'login') {
+                htmlContent = `
+                    <div class="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-blue-700 to-purple-800 text-white animate-fade-in">
+                        <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-sm p-12 rounded-3xl shadow-2xl max-w-md w-full text-center transform transition-all duration-500 ease-in-out scale-100 hover:scale-105">
+                            <img src="${logoUrl}" alt="Logo Konseling" class="mx-auto mb-8 w-32 h-32 object-contain" onerror="this.onerror=null;this.src='https://placehold.co/128x128/ccc/fff?text=Logo';" />
+                            <h1 class="text-5xl font-extrabold mb-8 drop-shadow-lg">
+                                Selamat Datang
+                            </h1>
+                            <div class="space-y-6 text-left">
+                                <div class="animate-slide-up">
+                                    <label for="user-type" class="block text-lg font-medium text-white mb-2 flex items-center">
+                                        ${getLucideIcon('Users', 'w-5 h-5 mr-2')} Pilih Tipe Pengguna:
+                                    </label>
+                                    <select id="user-type" class="w-full p-3 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm">
+                                        <option value="">Pilih Tipe Pengguna</option>
+                                        <option value="klien">Klien</option>
+                                        <option value="konselor">Konselor</option>
+                                    </select>
+                                </div>
+                                <div class="animate-slide-up delay-100">
+                                    <label for="password" class="block text-lg font-medium text-white mb-2 flex items-center">
+                                        ${getLucideIcon('Lock', 'w-5 h-5 mr-2')} Kata Sandi:
+                                    </label>
+                                    <div class="relative">
+                                        <input type="password" id="password" class="w-full p-3 pr-10 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm" placeholder="Masukkan kata sandi Anda">
+                                        <button type="button" id="toggle-password-visibility" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500">
+                                            ${getLucideIcon('Eye', 'w-5 h-5')}
+                                        </button>
+                                    </div>
+                                </div>
+                                <button id="login-button" class="w-full bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-300 flex items-center justify-center mx-auto">
+                                    ${getLucideIcon('LogIn', 'w-6 h-6 mr-2')} Masuk
+                                </button>
+                                <button id="login-reset-button" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-yellow-300 flex items-center justify-center mx-auto">
+                                    ${getLucideIcon('RotateCcw', 'w-6 h-6 mr-2')} Reset
+                                </button>
+                            </div>
+                            <button id="login-back-button" class="mt-6 bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center mx-auto">
+                                ${getLucideIcon('ArrowLeft', 'w-5 h-5 mr-2')} Kembali
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (currentPage === 'start') {
+                htmlContent = `
+                    <div class="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-blue-500 to-purple-600 text-white animate-fade-in">
+                        <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-sm p-10 rounded-3xl shadow-2xl max-w-2xl w-full text-center transform transition-all duration-500 ease-in-out scale-100 hover:scale-105">
+                            <h1 class="text-5xl font-extrabold text-gray-900 mb-6 drop-shadow-lg">Aplikasi Pengukuran Gaya Belajar</h1>
+                            <p class="text-xl text-gray-700 mb-10 leading-relaxed">
+                                Temukan gaya belajar dominan Anda (Visual, Auditori, Kinestetik) melalui serangkaian pernyataan sederhana.
+                            </p>
+                            <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+                                <button id="start-assessment-button" class="bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-bold py-4 px-10 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-300 flex items-center justify-center">
+                                    ${getLucideIcon('ClipboardCheck', 'w-6 h-6 mr-2 animate-pulse-slow')} Mulai Asesmen
+                                </button>
+                                <!-- Removed "Lihat Riwayat Laporan" button -->
+                            </div>
+                            ${userId ? `<p class="mt-8 text-sm text-gray-600">ID Pengguna Anda: <span class="font-mono text-gray-800 break-all">${userId}</span></p>` : ''}
+                            <button id="logout-button-start" class="mt-8 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center mx-auto">
+                                ${getLucideIcon('LogOut', 'w-5 h-5 mr-2')} Keluar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (currentPage === 'instructions') {
+                htmlContent = `
+                    <div class="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-orange-400 to-red-500 text-white animate-fade-in">
+                        <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-sm p-10 rounded-3xl shadow-2xl max-w-3xl w-full text-center transform transition-all duration-500 ease-in-out scale-100 hover:scale-105">
+                            <h2 class="text-4xl font-extrabold text-gray-900 mb-6 drop-shadow-lg flex items-center justify-center">
+                                ${getLucideIcon('Lightbulb', 'w-10 h-10 mr-4 text-yellow-500 animate-bounce-slow')} Petunjuk Pengisian Asesmen
+                            </h2>
+                            <div class="text-left text-gray-700 space-y-6 text-lg">
+                                <div class="flex items-start p-4 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                                    <span class="mr-4 text-3xl text-blue-600 flex-shrink-0">${getLucideIcon('Pointer', '')}</span>
+                                    <p>Selamat datang di Kuesioner Gaya Belajar! Asesmen ini dirancang untuk membantu Anda memahami preferensi belajar Anda.</p>
+                                </div>
+                                <div class="flex items-start p-4 bg-green-50 rounded-lg border border-green-200 shadow-sm">
+                                    <span class="mr-4 text-3xl text-green-600 flex-shrink-0">${getLucideIcon('ClipboardCheck', '')}</span>
+                                    <p>Anda akan menemukan serangkaian pernyataan yang terbagi dalam tiga kategori: <strong>Visual</strong>, <strong>Auditori</strong>, dan <strong>Kinestetik</strong>. Setiap kategori memiliki ${categories[0].statements.length} pernyataan.</p>
+                                </div>
+                                <div class="p-4 bg-purple-50 rounded-lg border border-purple-200 shadow-sm">
+                                    <div class="flex items-start mb-3">
+                                        <span class="mr-4 text-3xl text-purple-600 flex-shrink-0">${getLucideIcon('CheckCircle', '')}</span>
+                                        <p>Untuk setiap pernyataan, bacalah dengan saksama dan pilih opsi yang paling sesuai dengan diri Anda:</p>
+                                    </ul>
+                                </div>
+                                <div class="flex items-start p-4 bg-yellow-50 rounded-lg border border-yellow-200 shadow-sm">
+                                    <span class="mr-4 text-3xl text-yellow-600 flex-shrink-0">${getLucideIcon('Lightbulb', '')}</span>
+                                    <p>Jawablah dengan jujur dan spontan, tidak ada jawaban yang benar atau salah. Hasil asesmen ini akan memberikan gambaran tentang gaya belajar dominan Anda, yang dapat membantu Anda mengoptimalkan cara belajar Anda.</p>
+                                </div>
+                                <p class="text-center font-bold text-xl text-gray-800 mt-8 py-4 bg-gray-100 rounded-lg shadow-inner">
+                                    Selamat mengerjakan! ✨
+                                </p>
+                            </div>
+                            <div class="flex justify-center mt-8 space-x-4">
+                                <button id="instructions-back-button" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center">
+                                    ${getLucideIcon('ArrowLeft', 'w-5 h-5 mr-2')} Kembali
+                                </button>
+                                <button id="instructions-next-button" class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:-translate-y-1 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 flex items-center justify-center">
+                                    Lanjutkan ke Biodata ${getLucideIcon('ArrowRight', 'w-5 h-5 ml-2')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (currentPage === 'biodata') {
+                htmlContent = `
+                    <div class="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-br from-teal-400 to-cyan-500 text-white animate-fade-in">
+                        <div class="bg-white bg-opacity-90 backdrop-filter backdrop-blur-sm p-10 rounded-3xl shadow-2xl max-w-2xl w-full text-center transform transition-all duration-500 ease-in-out scale-100 hover:scale-105">
+                            <h2 class="text-4xl font-extrabold text-gray-900 mb-8 drop-shadow-lg">Isi Biodata Anda</h2>
+                            <div class="space-y-6 text-left text-gray-800">
+                                <div class="relative">
+                                    <label for="name" class="block text-lg font-medium text-gray-700 mb-2">Nama Lengkap:</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            ${getLucideIcon('User', 'w-5 h-5 text-gray-400')}
+                                        </div>
+                                        <input
+                                            type="text"
+                                            id="name"
+                                            list="name-suggestions"
+                                            value="${biodata.name}"
+                                            class="w-full p-3 pl-10 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 text-gray-900 shadow-sm"
+                                            placeholder="Masukkan nama Anda"
+                                        />
+                                        <datalist id="name-suggestions">
+                                            ${allNames.map(name => `<option value="${name}"></option>`).join('')}
+                                        </datalist>
+                                    </div>
+                                </div>
+                                <div class="relative">
+                                    <label for="class" class="block text-lg font-medium text-gray-700 mb-2">Kelas:</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            ${getLucideIcon('Book', 'w-5 h-5 text-gray-400')}
+                                        </div>
+                                        <select
+                                            id="class"
+                                            class="w-full p-3 pl-10 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 text-gray-900 appearance-none pr-10 shadow-sm"
+                                        >
+                                            <option value="">Pilih Kelas</option>
+                                            <option value="VII Imam Ahmad" ${biodata.class === 'VII Imam Ahmad' ? 'selected' : ''}>VII Imam Ahmad</option>
+                                            <option value="VII Imam Malik" ${biodata.class === 'VII Imam Malik' ? 'selected' : ''}>VII Imam Malik</option>
+                                            <option value="VII Imam Syafi\'i" ${biodata.class === 'VII Imam Syafi\'i' ? 'selected' : ''}>VII Imam Syafi'i</option>
+                                            <option value="VIII Hasan Al - Bashri" ${biodata.class === 'VIII Hasan Al - Bashri' ? 'selected' : ''}>VIII Hasan Al - Bashri</option>
+                                            <option value="VIII Sufyan Bin Uyainah" ${biodata.class === 'VIII Sufyan Bin Uyainah' ? 'selected' : ''}>VIII Sufyan Bin Uyainah</option>
+                                            <option value="VIII Sufyan Ats-Tsaury" ${biodata.class === 'VIII Sufyan Ats-Tsaury' ? 'selected' : ''}>VIII Sufyan Ats-Tsaury</option>
+                                            <option value="IX Sufyan Bin Jubair" ${biodata.class === 'IX Sufyan Bin Jubair' ? 'selected' : ''}>IX Sufyan Bin Jubair</option>
+                                            <option value="IX Sufyan Bin Musayyab" ${biodata.class === 'IX Sufyan Bin Musayyab' ? 'selected' : ''}>IX Sufyan Bin Musayyab</option>
+                                            <option value="IX Urwah Bin Zubair" ${biodata.class === 'IX Urwah Bin Zubair' ? 'selected' : ''}>IX Urwah Bin Zubair</option>
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 6.757 7.586 5.343 9z"/></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="relative">
+                                    <label for="gender" class="block text-lg font-medium text-gray-700 mb-2">Jenis Kelamin:</label>
+                                    <div class="relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            ${getLucideIcon('Users', 'w-5 h-5 text-gray-400')}
+                                        </div>
+                                        <select
+                                            id="gender"
+                                            class="w-full p-3 pl-10 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 text-gray-900 appearance-none pr-10 shadow-sm"
+                                        >
+                                            <option value="">Pilih Jenis Kelamin</option>
+                                            <option value="Laki-laki" ${biodata.gender === 'Laki-laki' ? 'selected' : ''}>Laki-laki</option>
+                                            <option value="Perempuan" ${biodata.gender === 'Perempuan' ? 'selected' : ''}>Perempuan</option>
+                                            <option value="Lainnya" ${biodata.gender === 'Lainnya' ? 'selected' : ''}>Lainnya</option>
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 6.757 7.586 5.343 9z"/></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex justify-center mt-10 space-x-4">
+                                <button id="biodata-back-button" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center">
+                                    ${getLucideIcon('ArrowLeft', 'w-5 h-5 mr-2')} Kembali
+                                </button>
+                                <button id="biodata-next-button" ${!isBiodataComplete ? 'disabled' : ''} class="py-3 px-8 rounded-full font-bold shadow-lg transition duration-300 ease-in-out transform ${
+                                    isBiodataComplete
+                                        ? 'bg-green-600 hover:bg-green-700 text-white hover:scale-105'
+                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                } flex items-center justify-center">
+                                    Lanjutkan ke Asesmen ${getLucideIcon('ArrowRight', 'w-5 h-5 ml-2')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (currentPage === 'assessment') {
+                let statementsHtml = '';
+                currentCategory.statements.forEach((statement, index) => {
+                    const isSelectedYes = responses[statement.id] === 1;
+                    const isSelectedNo = responses[statement.id] === 0;
+                    statementsHtml += `
+                        <div class="relative p-6 border-2 border-transparent rounded-lg bg-gradient-to-br from-white to-gray-50 shadow-xl hover:shadow-2xl hover:border-blue-500 transition-all duration-300 transform hover:-translate-y-1">
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                                <p class="text-lg font-medium text-gray-800 mb-3 sm:mb-0 flex items-center flex-grow">
+                                    <span class="mr-3 text-2xl font-extrabold text-purple-700 min-w-[40px] text-left">${index + 1}.</span> <span class="flex-grow">${statement.text}</span>
+                                </p>
+                                <div class="flex space-x-4 w-full sm:w-auto justify-center sm:justify-end mt-4 sm:mt-0">
+                                    <button data-statement-id="${statement.id}" data-score="1" class="response-button py-2 px-6 rounded-full font-semibold transition duration-300 ease-in-out transform flex items-center justify-center ${
+                                        isSelectedYes
+                                            ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-xl scale-105 animate-scale-bounce'
+                                            : 'bg-gray-200 text-blue-700 hover:bg-blue-300 hover:shadow-md'
+                                    }">
+                                        ${getLucideIcon('Check', 'w-5 h-5 mr-2')} Ya
+                                    </button>
+                                    <button data-statement-id="${statement.id}" data-score="0" class="response-button py-2 px-6 rounded-full font-semibold transition duration-300 ease-in-out transform ${
+                                        isSelectedNo
+                                            ? 'bg-gradient-to-r from-red-600 to-red-800 text-white shadow-xl scale-105 animate-scale-bounce'
+                                            : 'bg-gray-200 text-red-700 hover:bg-red-300 hover:shadow-md'
+                                    }">
+                                        ${getLucideIcon('X', 'w-5 h-5 mr-2')} Tidak
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Removed the check/cross icons from here -->
+                        </div>
+                    `;
+                });
+
+                htmlContent = `
+                    <div class="min-h-screen p-4 bg-gradient-to-br from-green-400 to-blue-500 flex flex-col items-center animate-fade-in">
+                        <div class="bg-white bg-opacity-95 backdrop-filter backdrop-blur-sm p-8 rounded-xl shadow-2xl max-w-3xl w-full mt-8 mb-8">
+                            <div class="sticky top-0 z-10 bg-white bg-opacity-95 backdrop-filter backdrop-blur-sm py-4 mb-6 rounded-t-xl -mx-8 px-8">
+                                <div class="flex items-center justify-center">
+                                    ${currentCategory.icon("w-20 h-20 text-indigo-700 mr-4 animate-bounce-slow")}
+                                    <h2 class="text-3xl font-bold text-indigo-700 text-center">Asesmen Gaya Belajar: ${currentCategory.name}</h2>
+                                </div>
+                                <p class="text-gray-600 mt-4 text-center">
+                                    Pilih "Ya" jika pernyataan sesuai dengan Anda, dan "Tidak" jika tidak.
+                                </p>
+                                <div class="w-full bg-gray-200 rounded-full h-3 mt-4 mb-2">
+                                    <div
+                                        class="bg-purple-600 h-3 rounded-full transition-all duration-500 ease-in-out"
+                                        style="width: ${overallProgress}%"
+                                    ></div>
+                                </div>
+                                <p class="text-right text-sm text-gray-600">
+                                    Progres Keseluruhan: ${Math.round(overallProgress)}%
+                                </p>
+                            </div>
+                            <div class="space-y-6">
+                                ${statementsHtml}
+                            </div>
+                            <div class="flex justify-center mt-8 space-x-4">
+                                ${currentCategoryIndex > 0 ? `
+                                    <button id="assessment-back-button" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-full shadow-md transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center">
+                                        ${getLucideIcon('ArrowLeft', 'w-5 h-5 mr-2')} Kembali
+                                    </button>
+                                ` : ''}
+                                ${currentCategoryIndex < categories.length - 1 ? `
+                                    <button id="assessment-next-button" ${!allStatementsAnsweredInCurrentCategory ? 'disabled' : ''} class="py-3 px-8 rounded-full font-bold shadow-lg transition duration-300 ease-in-out transform ${
+                                        allStatementsAnsweredInCurrentCategory
+                                            ? 'bg-purple-600 hover:bg-purple-700 text-white hover:scale-105'
+                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    } flex items-center justify-center">
+                                        Selanjutnya ${getLucideIcon('ChevronRight', 'w-5 h-5 ml-2')}
+                                    </button>
+                                ` : `
+                                    <button id="submit-assessment-button" ${!allStatementsAnsweredOverall ? 'disabled' : ''} class="py-3 px-8 rounded-full font-bold shadow-lg transition duration-300 ease-in-out transform ${
+                                        allStatementsAnsweredOverall
+                                            ? 'bg-green-600 hover:bg-green-700 text-white hover:scale-105 animate-pulse-slow'
+                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    } flex items-center justify-center">
+                                        ${getLucideIcon('Save', 'w-5 h-5 mr-2')} Simpan
+                                    </button>
+                                `}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (currentPage === 'report') {
+                const formattedDate = reportData ? getDisplayDate(reportData.timestamp) : '';
+
+                htmlContent = `
+                    <div class="min-h-screen p-4 flex flex-col items-center animate-fade-in">
+                        <div id="report-content" class="bg-gradient-to-br from-purple-400 to-pink-500 text-white p-8 rounded-xl shadow-2xl max-w-3xl w-full mt-8 print-area-container">
+                            <div class="text-center mb-8 border-b-2 border-gray-300 pb-4">
+                                <img src="${logoUrl}" alt="Logo Konseling" class="mx-auto mb-4 w-24 h-24 object-contain" onerror="this.onerror=null;this.src='https://placehold.co/96x96/ccc/fff?text=Logo';" />
+                                <h1 class="text-3xl font-extrabold text-white">PUSAT BIMBINGAN KONSELING</h1>
+                                <p class="text-lg text-gray-200">Jl. Contoh No. 123, Kota Bahagia, Kode Pos 12345</p>
+                                <p class="text-lg text-gray-200">Telepon: (021) 123-4567 | Email: info@konseling.com</p>
+                            </div>
+                            <h2 class="text-4xl font-bold text-white mb-6 text-center">Laporan Gaya Belajar Anda</h2>
+                            ${reportData ? `
+                                <div class="text-gray-200 mb-6 text-center">
+                                    <p><span class="font-semibold">Nama:</span> ${reportData.biodata.name}</p>
+                                    <p><span class="font-semibold">Kelas/Jenjang:</span> ${reportData.biodata.class}</p>
+                                    <p><span class="font-semibold">Jenis Kelamin:</span> ${reportData.biodata.gender}</p>
+                                    <p><span class="font-semibold">Tanggal Asesmen:</span> ${formattedDate}</p>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                    <div class="bg-blue-100 p-6 rounded-xl border border-blue-300 shadow-md text-center flex flex-col items-center transform hover:scale-105 transition-transform duration-300 animate-fade-in">
+                                        ${categories.find(cat => cat.type === 'visual').icon("w-16 h-16 text-blue-600 mb-3 animate-pulse-slow")}
+                                        <h3 class="text-xl font-semibold text-blue-800 mb-2">Visual</h3>
+                                        <p class="text-5xl font-extrabold text-blue-900">${reportData.scores.visual}</p>
+                                        <p class="text-gray-600">poin (max ${categories.find(cat => cat.type === 'visual').statements.length})</p>
+                                    </div>
+                                    <div class="bg-green-100 p-6 rounded-xl border border-green-300 shadow-md text-center flex flex-col items-center transform hover:scale-105 transition-transform duration-300 animate-fade-in delay-100">
+                                        ${categories.find(cat => cat.type === 'auditory').icon("w-16 h-16 text-green-600 mb-3 animate-pulse-slow")}
+                                        <h3 class="text-xl font-semibold text-green-800 mb-2">Auditori</h3>
+                                        <p class="text-5xl font-extrabold text-green-900">${reportData.scores.auditory}</p>
+                                        <p class="text-gray-600">poin (max ${categories.find(cat => cat.type === 'auditory').statements.length})</p>
+                                    </div>
+                                    <div class="bg-yellow-100 p-6 rounded-xl border border-yellow-300 shadow-md text-center flex flex-col items-center transform hover:scale-105 transition-transform duration-300 animate-fade-in delay-200">
+                                        ${categories.find(cat => cat.type === 'kinesthetic').icon("w-16 h-16 text-yellow-600 mb-3 animate-pulse-slow")}
+                                        <h3 class="text-xl font-semibold text-yellow-800 mb-2">Kinestetik</h3>
+                                        <p class="text-5xl font-extrabold text-yellow-900">${reportData.scores.kinesthetic}</p>
+                                        <p class="text-gray-600">poin (max ${categories.find(cat => cat.type === 'kinesthetic').statements.length})</p>
+                                    </div>
+                                </div>
+                                <div class="bg-gradient-to-r from-purple-100 to-indigo-100 p-8 rounded-xl border border-purple-300 shadow-lg mb-8 animate-slide-up">
+                                    <h3 class="text-3xl font-bold text-purple-800 mb-4 text-center">Gaya Belajar Dominan Anda:</h3>
+                                    <p class="text-5xl font-extrabold text-purple-900 mb-6 text-center animate-bounce-slow">
+                                        ${reportData.dominantStyles.join(', ')}
+                                    </p>
+                                    <p class="text-gray-700 leading-relaxed text-center text-lg">
+                                        ${dominantStyleSummary()}
+                                    </p>
+                                </div>
+                                <div class="bg-gradient-to-r from-gray-100 to-gray-200 p-7 rounded-xl border border-gray-300 shadow-inner mb-8 animate-slide-up delay-100">
+                                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Strategi Belajar yang Dipersonalisasi:</h3>
+                                    <p class="text-gray-700 mb-6">
+                                        Berikut adalah ringkasan strategi belajar yang bisa Anda terapkan berdasarkan gaya belajar dominan Anda. Untuk rekomendasi lengkap, unduh laporan dalam format teks.
+                                    </p>
+                                    ${categories.map(category => {
+                                        const isDominant = reportData.dominantStyles.includes(category.name);
+                                        const type = category.type;
+                                        if (isDominant) {
+                                            return `
+                                                <div class="mb-4 last:mb-0 p-4 bg-white rounded-lg shadow-md border border-blue-200">
+                                                    <h4 class="text-xl font-semibold mb-2 text-blue-700 flex items-center">
+                                                        ${category.icon("w-6 h-6 mr-2")} Untuk Gaya ${category.name} (Dominan):
+                                                    </h4>
+                                                    <p class="text-gray-600 pl-8">${getConciseRecommendations(type)}</p>
+                                                </div>
+                                            `;
+                                        }
+                                        return '';
+                                    }).join('')}
+
+                                    <div class="mt-6 pt-4 border-t border-gray-300">
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-3">Gaya Lainnya:</h4>
+                                        <ul class="list-disc list-inside text-gray-600 space-y-1 pl-4">
+                                            ${categories.filter(cat => !reportData.dominantStyles.includes(cat.name)).map(category => `
+                                                <li>Gaya ${category.name} Anda berkontribusi dengan ${reportData.scores[category.type]} poin.</li>
+                                            `).join('')}
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col items-end mt-12 w-full">
+                                    <p class="text-gray-200 mb-1">Batam, ${formattedDate}</p>
+                                    <p class="font-semibold text-white mb-1">Mengetahui,</p>
+                                    <p class="font-semibold text-white mb-2">Konselor,</p>
+                                    <img
+                                        src="https://placehold.co/100x100/000/fff?text=QR+Code+Signature"
+                                        alt="QR Code Tanda Tangan"
+                                        class="w-28 h-28 mb-2 border border-gray-300 rounded-md"
+                                    />
+                                    <p class="font-semibold text-white underline">Raja Aryansah, S.Pd</p>
+                                </div>
+                            ` : `
+                                <p class="text-center text-gray-200">Tidak ada data laporan untuk ditampilkan. Silakan selesaikan asesmen terlebih dahulu.</p>
+                            `}
+                        </div>
+                        <div class="flex flex-wrap justify-center mt-8 space-x-4 space-y-4 sm:space-y-0 mb-8 no-print">
+                            <button id="report-reassess-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-300 flex items-center justify-center animate-pulse-slow">
+                                ${getLucideIcon('RefreshCw', 'w-5 h-5 mr-2')} Ulangi Asesmen
+                            </button>
+                            <button id="report-save-download-pdf-button" ${isGeneratingPdf ? 'disabled' : ''} class="py-3 px-6 rounded-full font-bold shadow-lg transition duration-300 ease-in-out transform ${
+                                isGeneratingPdf
+                                    ? 'bg-orange-300 text-orange-700 cursor-not-allowed'
+                                    : 'bg-orange-600 hover:bg-orange-700 text-white hover:scale-105 focus:outline-none focus:ring-4 focus:ring-orange-300 animate-pulse-slow'
+                            } flex items-center justify-center">
+                                ${getLucideIcon('Save', 'w-5 h-5 mr-2')} ${isGeneratingPdf ? 'Membuat PDF...' : 'Unduh PDF'}
+                            </button>
+                            <button id="report-print-button" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-300 flex items-center justify-center animate-pulse-slow">
+                                ${getLucideIcon('Printer', 'w-5 h-5 mr-2')} Cetak Laporan
+                            </button>
+                            
+                            <button id="report-home-button" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-300 flex items-center justify-center animate-pulse-slow">
+                                ${getLucideIcon('Home', 'w-5 h-5 mr-2')} Kembali ke Beranda
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (currentPage === 'history') {
+                let reportsListHtml = '';
+                if (userReports.length > 0) {
+                    userReports.forEach(report => {
+                        reportsListHtml += `
+                            <li class="p-5 border border-gray-200 rounded-lg bg-gray-50 shadow-md hover:shadow-lg transition-shadow duration-300">
+                                <p class="text-lg font-semibold text-gray-800">
+                                    Laporan pada: <span class="text-blue-700">${getDisplayDate(report.timestamp)}</span>
+                                </p>
+                                <p class="text-gray-700 mt-2">
+                                    Nama: <span class="font-medium">${report.biodata?.name || 'N/A'}</span>, Kelas: <span class="font-medium">${report.biodata?.class || 'N/A'}</span>, Jenis Kelamin: <span class="font-medium">${report.biodata?.gender || 'N/A'}</span>
+                                </p>
+                                <p class="text-gray-700 mt-2">
+                                    Gaya Dominan: <span class="font-medium text-purple-700">${report.dominantStyles.join(', ')}</span>
+                                </p>
+                                <p class="text-gray-600 text-sm">
+                                    Skor Visual: <span class="font-medium">${report.scores.visual}</span>, Auditori: <span class="font-medium">${report.scores.auditory}</span>, Kinestetik: <span class="font-medium">${report.scores.kinesthetic}</span>
+                                </p>
+                            </li>
+                        `;
+                    });
+                } else {
+                    reportsListHtml = `<p class="text-center text-gray-600">Anda belum memiliki laporan tersimpan.</p>`;
+                }
+
+                htmlContent = `
+                    <div class="min-h-screen p-4 bg-gradient-to-br from-teal-400 to-cyan-500 flex flex-col items-center animate-fade-in">
+                        <div class="bg-white bg-opacity-95 backdrop-filter backdrop-blur-sm p-8 rounded-xl shadow-2xl max-w-3xl w-full mt-8 mb-8">
+                            <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Riwayat Laporan Anda</h2>
+                            <ul class="space-y-4">
+                                ${reportsListHtml}
+                            </ul>
+                            <div class="flex justify-center mt-8">
+                                <button id="history-home-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 flex items-center justify-center">
+                                    ${getLucideIcon('Home', 'w-5 h-5 mr-2 animate-pulse-slow')} Kembali ke Beranda
+                                </button>
+                            </div>
+                            <button id="logout-button-history" class="mt-8 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center mx-auto">
+                                ${getLucideIcon('LogOut', 'w-5 h-5 mr-2')} Keluar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else if (currentPage === 'konselorDashboard') {
+                const filteredKlienReports = getFilteredKlienReports();
+                let klienListHtml = '';
+                if (filteredKlienReports.length > 0) {
+                    klienListHtml = `
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white rounded-lg shadow-md overflow-hidden">
+                                <thead class="bg-gray-200 text-gray-700 uppercase text-sm leading-normal">
+                                    <tr>
+                                        <th class="py-3 px-6 text-left">Nama Klien</th>
+                                        <th class="py-3 px-6 text-left">Kelas</th>
+                                        <th class="py-3 px-6 text-left">Jenis Kelamin</th>
+                                        <th class="py-3 px-6 text-left">Gaya Dominan</th>
+                                        <th class="py-3 px-6 text-left">Tanggal</th>
+                                        <th class="py-3 px-6 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-gray-600 text-sm font-light">
+                                    ${filteredKlienReports.map(report => `
+                                        <tr class="border-b border-gray-200 hover:bg-gray-100">
+                                            <td class="py-3 px-6 text-left whitespace-nowrap">${report.biodata?.name || 'N/A'}</td>
+                                            <td class="py-3 px-6 text-left">${report.biodata?.class || 'N/A'}</td>
+                                            <td class="py-3 px-6 text-left">${report.biodata?.gender || 'N/A'}</td>
+                                            <td class="py-3 px-6 text-left">${report.dominantStyles?.join(', ') || 'N/A'}</td>
+                                            <td class="py-3 px-6 text-left">${getDisplayDate(report.timestamp)}</td>
+                                            <td class="py-3 px-6 text-center">
+                                                <button data-report-id="${report.id}" class="view-konselor-report-button bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded-full text-xs transition duration-300 ease-in-out transform hover:scale-105">
+                                                    Lihat Laporan
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                } else {
+                    klienListHtml = `<p class="text-center text-gray-600">Belum ada laporan klien yang tersedia atau tidak ada yang cocok dengan filter.</p>`;
+                }
+
+                htmlContent = `
+                    <div class="min-h-screen p-4 bg-gradient-to-br from-purple-500 to-indigo-600 flex flex-col items-center animate-fade-in">
+                        <div class="bg-white bg-opacity-95 backdrop-filter backdrop-blur-sm p-8 rounded-xl shadow-2xl max-w-5xl w-full mt-8 mb-8">
+                            <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">Dashboard Konselor</h2>
+                            <div class="mb-6 flex flex-wrap gap-4 justify-center">
+                                <input
+                                    type="text"
+                                    id="konselor-search-input"
+                                    placeholder="Cari nama, kelas, gaya..."
+                                    value="${konselorSearchTerm}"
+                                    class="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 w-full sm:w-64"
+                                />
+                                <select id="konselor-filter-class" class="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Semua Kelas</option>
+                                    <option value="VII Imam Ahmad" ${konselorFilterClass === 'VII Imam Ahmad' ? 'selected' : ''}>VII Imam Ahmad</option>
+                                    <option value="VII Imam Malik" ${konselorFilterClass === 'VII Imam Malik' ? 'selected' : ''}>VII Imam Malik</option>
+                                    <option value="VII Imam Syafi\'i" ${konselorFilterClass === 'VII Imam Syafi\'i' ? 'selected' : ''}>VII Imam Syafi'i</option>
+                                    <option value="VIII Hasan Al - Bashri" ${konselorFilterClass === 'VIII Hasan Al - Bashri' ? 'selected' : ''}>VIII Hasan Al - Bashri</option>
+                                    <option value="VIII Sufyan Bin Uyainah" ${konselorFilterClass === 'VIII Sufyan Bin Uyainah' ? 'selected' : ''}>VIII Sufyan Bin Uyainah</option>
+                                    <option value="VIII Sufyan Ats-Tsaury" ${konselorFilterClass === 'VIII Sufyan Ats-Tsaury' ? 'selected' : ''}>VIII Sufyan Ats-Tsaury</option>
+                                    <option value="IX Sufyan Bin Jubair" ${konselorFilterClass === 'IX Sufyan Bin Jubair' ? 'selected' : ''}>IX Sufyan Bin Jubair</option>
+                                    <option value="IX Sufyan Bin Musayyab" ${konselorFilterClass === 'IX Sufyan Bin Musayyab' ? 'selected' : ''}>IX Sufyan Bin Musayyab</option>
+                                    <option value="IX Urwah Bin Zubair" ${konselorFilterClass === 'IX Urwah Bin Zubair' ? 'selected' : ''}>IX Urwah Bin Zubair</option>
+                                </select>
+                                <select id="konselor-filter-gender" class="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Semua Jenis Kelamin</option>
+                                    <option value="Laki-laki" ${konselorFilterGender === 'Laki-laki' ? 'selected' : ''}>Laki-laki</option>
+                                    <option value="Perempuan" ${konselorFilterGender === 'Perempuan' ? 'selected' : ''}>Perempuan</option>
+                                    <option value="Lainnya" ${konselorFilterGender === 'Lainnya' ? 'selected' : ''}>Lainnya</option>
+                                </select>
+                                <select id="konselor-filter-style" class="p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Semua Gaya</option>
+                                    <option value="Visual" ${konselorFilterStyle === 'Visual' ? 'selected' : ''}>Visual</option>
+                                    <option value="Auditori" ${konselorFilterStyle === 'Auditori' ? 'selected' : ''}>Auditori</option>
+                                    <option value="Kinestetik" ${konselorFilterStyle === 'Kinestetik' ? 'selected' : ''}>Kinestetik</option>
+                                </select>
+                            </div>
+                            ${klienListHtml}
+                            <button id="logout-button-konselor" class="mt-8 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105 flex items-center justify-center mx-auto">
+                                ${getLucideIcon('LogOut', 'w-5 h-5 mr-2')} Keluar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Modal rendering
+            let modalHtml = '';
+            if (showModal) {
+                let modalIcon = '';
+                let modalIconColorClass = '';
+                if (modalMessage.includes('berhasil')) {
+                    modalIcon = getLucideIcon('CheckCircle', 'w-8 h-8');
+                    modalIconColorClass = 'text-green-500';
+                } else if (modalMessage.includes('gagal') || modalMessage.includes('salah') || modalMessage.includes('kesalahan')) {
+                    modalIcon = getLucideIcon('XCircle', 'w-8 h-8');
+                    modalIconColorClass = 'text-red-500';
+                }
+
+                modalHtml = `
+                    <div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 animate-fade-in">
+                        <div class="bg-white p-8 rounded-lg shadow-xl max-w-sm w-full text-center transform animate-scale-bounce">
+                            <div class="flex flex-col items-center justify-center mb-4">
+                                <div class="${modalIconColorClass} mb-3">
+                                    ${modalIcon}
+                                </div>
+                                <h3 class="text-2xl font-semibold text-gray-800 mb-2">Pesan</h3>
+                            </div>
+                            <p class="text-gray-700 mb-6 text-lg">${modalMessage}</p>
+                            ${!isGeneratingPdf ? `
+                                <button id="modal-close-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-md transition duration-300 flex items-center justify-center mx-auto">
+                                    ${getLucideIcon('XCircle', 'w-5 h-5 mr-2')} Tutup
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            appRoot.innerHTML = `<div class="page-transition-container">${htmlContent}</div>${modalHtml}`;
+            attachEventListeners();
+        }
+
+        function attachEventListeners() {
+            // Cover Page
+            const startButton = appRoot.querySelector('#start-button');
+            if (startButton) {
+                startButton.onclick = () => navigateToPage('login');
+            }
+
+            // Login Page
+            const loginButton = appRoot.querySelector('#login-button');
+            if (loginButton) {
+                loginButton.onclick = handleLogin;
+            }
+            const passwordInput = appRoot.querySelector('#password');
+            if (passwordInput) {
+                passwordInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        handleLogin();
+                    }
+                });
+            }
+            const loginBackButton = appRoot.querySelector('#login-back-button');
+            if (loginBackButton) {
+                loginBackButton.onclick = () => navigateToPage('cover');
+            }
+            const loginResetButton = appRoot.querySelector('#login-reset-button');
+            if (loginResetButton) {
+                loginResetButton.onclick = () => {
+                    const userTypeSelect = appRoot.querySelector('#user-type');
+                    const passwordInput = appRoot.querySelector('#password');
+                    if (userTypeSelect) userTypeSelect.value = '';
+                    if (passwordInput) passwordInput.value = '';
+                    // Reset password input type to password and eye icon to Eye
+                    if (passwordInput) passwordInput.setAttribute('type', 'password');
+                    const togglePasswordVisibilityButton = appRoot.querySelector('#toggle-password-visibility');
+                    if (togglePasswordVisibilityButton) togglePasswordVisibilityButton.innerHTML = getLucideIcon('Eye', 'w-5 h-5');
+                    render(); // Re-render to clear any visual state if needed
+                };
+            }
+            const togglePasswordVisibilityButton = appRoot.querySelector('#toggle-password-visibility');
+            if (togglePasswordVisibilityButton) {
+                togglePasswordVisibilityButton.onclick = () => {
+                    const passwordInput = appRoot.querySelector('#password');
+                    if (passwordInput) {
+                        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                        passwordInput.setAttribute('type', type);
+                        // Change icon based on visibility
+                        togglePasswordVisibilityButton.innerHTML = type === 'password' ? getLucideIcon('Eye', 'w-5 h-5') : getLucideIcon('EyeOff', 'w-5 h-5');
+                    }
+                };
+            }
+
+
+            // Start Page (for Klien)
+            const startAssessmentButton = appRoot.querySelector('#start-assessment-button');
+            if (startAssessmentButton) {
+                startAssessmentButton.onclick = () => {
+                    navigateToPage('instructions');
+                    responses = {};
+                    reportData = null;
+                    currentCategoryIndex = 0;
+                    biodata = { name: '', class: '', gender: '' };
+                };
+            }
+            // Removed event listener for view history button as the button itself is removed
+            // const viewHistoryButton = appRoot.querySelector('#view-history-button');
+            // if (viewHistoryButton) {
+            //     viewHistoryButton.onclick = () => navigateToPage('history');
+            // }
+            const logoutButtonStart = appRoot.querySelector('#logout-button-start');
+            if (logoutButtonStart) {
+                logoutButtonStart.onclick = handleLogout;
+            }
+
+            // Instructions Page
+            const instructionsBackButton = appRoot.querySelector('#instructions-back-button');
+            if (instructionsBackButton) {
+                instructionsBackButton.onclick = () => navigateToPage('start');
+            }
+            const instructionsNextButton = appRoot.querySelector('#instructions-next-button');
+            if (instructionsNextButton) {
+                instructionsNextButton.onclick = () => navigateToPage('biodata');
+            }
+
+            // Biodata Page
+            const nameInput = appRoot.querySelector('#name');
+            if (nameInput) {
+                nameInput.onchange = (e) => setBiodataField('name', e.target.value);
+            }
+            const classSelect = appRoot.querySelector('#class');
+            if (classSelect) {
+                classSelect.onchange = (e) => setBiodataField('class', e.target.value);
+            }
+            const genderSelect = appRoot.querySelector('#gender');
+            if (genderSelect) {
+                genderSelect.onchange = (e) => setBiodataField('gender', e.target.value);
+            }
+            const biodataBackButton = appRoot.querySelector('#biodata-back-button');
+            if (biodataBackButton) {
+                biodataBackButton.onclick = () => navigateToPage('instructions');
+            }
+            const biodataNextButton = appRoot.querySelector('#biodata-next-button');
+            if (biodataNextButton) {
+                biodataNextButton.onclick = () => {
+                    if (biodata.name && biodata.class && biodata.gender) {
+                        navigateToPage('assessment');
+                    } else {
+                        setModalMessage("Mohon lengkapi semua data biodata.");
+                        setShowModal(true);
+                    }
+                };
+            }
+
+            // Assessment Page
+            appRoot.querySelectorAll('.response-button').forEach(button => {
+                button.onclick = (e) => {
+                    const statementId = e.currentTarget.dataset.statementId;
+                    const score = parseInt(e.currentTarget.dataset.score);
+                    handleResponseChange(statementId, score, e.currentTarget);
+                };
+            });
+            const assessmentBackButton = appRoot.querySelector('#assessment-back-button');
+            if (assessmentBackButton) {
+                assessmentBackButton.onclick = () => {
+                    currentCategoryIndex--;
+                    navigateToPage('assessment');
+                };
+            }
+            const assessmentNextButton = appRoot.querySelector('#assessment-next-button');
+            if (assessmentNextButton) {
+                assessmentNextButton.onclick = () => {
+                    currentCategoryIndex++;
+                    navigateToPage('assessment');
+                };
+            }
+            const submitAssessmentButton = appRoot.querySelector('#submit-assessment-button');
+            if (submitAssessmentButton) {
+                submitAssessmentButton.onclick = handleSubmitAssessment;
+            }
+
+            // Report Page
+            const reportReassessButton = appRoot.querySelector('#report-reassess-button');
+            if (reportReassessButton) {
+                reportReassessButton.onclick = () => {
+                    navigateToPage('assessment');
+                    responses = {};
+                    reportData = null;
+                    currentCategoryIndex = 0;
+                };
+            }
+            const reportSaveDownloadPdfButton = appRoot.querySelector('#report-save-download-pdf-button');
+            if (reportSaveDownloadPdfButton) {
+                reportSaveDownloadPdfButton.onclick = handleSaveAndDownloadPdf;
+            }
+            const reportPrintButton = appRoot.querySelector('#report-print-button');
+            if (reportPrintButton) {
+                reportPrintButton.onclick = handlePrintReport;
+            }
+            const reportHomeButton = appRoot.querySelector('#report-home-button');
+            if (reportHomeButton) {
+                reportHomeButton.onclick = () => navigateToPage('start');
+            }
+
+            // History Page
+            const historyHomeButton = appRoot.querySelector('#history-home-button');
+            if (historyHomeButton) {
+                historyHomeButton.onclick = () => navigateToPage('start');
+            }
+            const logoutButtonHistory = appRoot.querySelector('#logout-button-history');
+            if (logoutButtonHistory) {
+                logoutButtonHistory.onclick = handleLogout;
+            }
+
+            // Konselor Dashboard
+            const logoutButtonKonselor = appRoot.querySelector('#logout-button-konselor');
+            if (logoutButtonKonselor) {
+                logoutButtonKonselor.onclick = handleLogout;
+            }
+            appRoot.querySelectorAll('.view-konselor-report-button').forEach(button => {
+                button.onclick = (e) => {
+                    const reportId = e.currentTarget.dataset.reportId;
+                    const selectedReport = allKlienReports.find(report => report.id === reportId);
+                    if (selectedReport) {
+                        reportData = {
+                            scores: selectedReport.scores,
+                            dominantStyles: selectedReport.dominantStyles,
+                            timestamp: selectedReport.timestamp, // This is already Firestore Timestamp
+                            biodata: selectedReport.biodata,
+                            responses: selectedReport.responses // Load responses for report view
+                        };
+                        responses = selectedReport.responses || {}; // Ensure responses are loaded
+                        navigateToPage('report');
+                    } else {
+                        setModalMessage("Laporan tidak ditemukan.");
+                        setShowModal(true);
+                    }
+                };
+            });
+
+            // Konselor Dashboard Filters
+            const konselorSearchInput = appRoot.querySelector('#konselor-search-input');
+            if (konselorSearchInput) {
+                konselorSearchInput.oninput = (e) => {
+                    konselorSearchTerm = e.target.value;
+                    render(); // Re-render to apply filter
+                };
+            }
+            const konselorFilterClassSelect = appRoot.querySelector('#konselor-filter-class');
+            if (konselorFilterClassSelect) {
+                konselorFilterClassSelect.onchange = (e) => {
+                    konselorFilterClass = e.target.value;
+                    render(); // Re-render to apply filter
+                };
+            }
+            const konselorFilterGenderSelect = appRoot.querySelector('#konselor-filter-gender');
+            if (konselorFilterGenderSelect) {
+                konselorFilterGender = e.target.value;
+                konselorFilterGenderSelect.onchange = (e) => {
+                    konselorFilterGender = e.target.value;
+                    render(); // Re-render to apply filter
+                };
+            }
+            const konselorFilterStyleSelect = appRoot.querySelector('#konselor-filter-style');
+            if (konselorFilterStyleSelect) {
+                konselorFilterStyleSelect.onchange = (e) => {
+                    konselorFilterStyle = e.target.value;
+                    render(); // Re-render to apply filter
+                };
+            }
+
+            // Modal
+            const modalCloseButton = appRoot.querySelector('#modal-close-button');
+            if (modalCloseButton) {
+                modalCloseButton.onclick = () => setShowModal(false);
+            }
+
+            // Set reportRef.current for PDF generation
+            reportRef.current = appRoot.querySelector('#report-content');
+        }
+
+        // Initial render and Firebase initialization
+        window.onload = () => {
+            initializeFirebase();
+            render(); // Initial render to show loading state
+        };
+    </script>
+</body>
+</html>
